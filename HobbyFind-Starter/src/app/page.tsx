@@ -186,6 +186,67 @@ export default function HomePage()
       ? USERS_DATA
       : USERS_DATA.filter((user) => user.category === activeCategory);
 
+  // --- 오늘의 취미 뽑기 (룰렛) 상태 및 로직 ---
+  const DRAW_KEY = 'hobby_draw_date';
+  const [showDrawModal, setShowDrawModal] = useState(false);
+  const [drawDone, setDrawDone] = useState(false);
+  const [spinning, setSpinning] = useState(false);
+  const [drawIndex, setDrawIndex] = useState(0);
+  const [drawSelection, setDrawSelection] = useState<null | { name: string; emoji: string; tip: string }>(null);
+
+  const DRAW_ITEMS = useMemo(
+    () => [
+      { name: 'LP 수집', emoji: '💿', tip: '음반 가게를 주말마다 방문해 보세요 — 운이 좋으면 희귀 음반을 발견할 수 있어요.' },
+      { name: '밤 러닝', emoji: '🌙🏃‍♂️', tip: '반사 조끼와 헤드라이트로 안전을 확보하세요.' },
+      { name: '픽셀 아트', emoji: '🎨', tip: '작은 캔버스(16x16)부터 시작해 보세요 — 복잡함은 천천히.' },
+      { name: '실내 클라이밍', emoji: '🧗‍♀️', tip: '처음엔 기초 코스에서 폼과 호흡을 연습하세요.' },
+      { name: '앤틱 리폼', emoji: '🪑', tip: '작은 서랍이나 의자부터 도전해 보세요 — 페인트가 큰 변화를 줍니다.' },
+      { name: '홈 브루잉', emoji: '🍺', tip: '간단한 스타터 키트로 소규모로 시작하세요.' },
+      { name: '가죽 공예', emoji: '👜', tip: '기본 바느질과 코바늘 기술로 소품을 만들어보세요.' },
+    ],
+    []
+  );
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(DRAW_KEY);
+      const today = new Date().toISOString().slice(0, 10);
+      if (stored === today) setDrawDone(true);
+    } catch (e) {
+      // ignore localStorage errors
+    }
+  }, []);
+
+  const openDraw = () => {
+    if (drawDone) return;
+    setShowDrawModal(true);
+    setSpinning(true);
+
+    const start = Date.now();
+    const duration = 2200; // ms
+    const interval = 80; // ms
+    const id = window.setInterval(() => {
+      setDrawIndex((i) => (i + 1) % DRAW_ITEMS.length);
+      if (Date.now() - start >= duration) {
+        window.clearInterval(id);
+        const final = Math.floor(Math.random() * DRAW_ITEMS.length);
+        setDrawIndex(final);
+        setDrawSelection(DRAW_ITEMS[final]);
+        setSpinning(false);
+        setDrawDone(true);
+        try {
+          const today = new Date().toISOString().slice(0, 10);
+          localStorage.setItem(DRAW_KEY, today);
+        } catch (e) {}
+      }
+    }, interval);
+  };
+
+  const closeDraw = () => {
+    setShowDrawModal(false);
+    // keep drawDone state (one-per-day)
+  };
+
   return (
     <main className="min-h-screen text-foreground">
       <header className="sticky top-0 z-20 border-b border-[#d7b99b] bg-[#fffaf3]/90 backdrop-blur-sm">
@@ -256,6 +317,24 @@ export default function HomePage()
               </p>
             </motion.div>
           </motion.div>
+        </div>
+      </section>
+
+      {/* 오늘의 취미 뽑기 버튼 영역 */}
+      <section className="mx-auto max-w-7xl px-4 pb-8 sm:px-6 lg:px-8">
+        <div className="flex justify-center">
+          <button
+            onClick={openDraw}
+            disabled={drawDone}
+            className={
+              `border-4 border-[#7a5134] bg-[#fffaf3] px-4 py-2 text-sm font-bold shadow-[4px_4px_0_#7a5134] transition-colors ` +
+              (drawDone
+                ? 'text-[#8e6a4f] opacity-60 cursor-not-allowed'
+                : 'text-[#5C4033] hover:bg-[#f7efe8]')
+            }
+          >
+            🎲 {drawDone ? '오늘의 취미 뽑기 완료 (내일 다시 도전!)' : '오늘의 취미 뽑기'}
+          </button>
         </div>
       </section>
 
@@ -372,28 +451,28 @@ export default function HomePage()
                       </button>
                     </div>
 
-                    <div className="absolute inset-x-0 bottom-0 flex items-end justify-between p-4">
-                      <div className="flex items-center gap-3">
-                        <div
-                          className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-white text-sm font-extrabold text-white shadow-[3px_3px_0_rgba(0,0,0,0.15)]"
-                          style={{ backgroundColor: user.profileColor }}
-                        >
-                          {user.name.slice(0, 2)}
-                        </div>
-                        <div>
-                          <p className="text-lg font-extrabold text-white">{user.name}</p>
-                          <p className="text-xs font-bold uppercase tracking-[0.12em] text-[#f8e6d2]">
-                            {user.category}
-                          </p>
-                        </div>
-                      </div>
-                      <span className="rounded-full border border-white/60 bg-white/10 px-2 py-1 text-[10px] font-bold text-white backdrop-blur-sm">
-                        {user.location}
-                      </span>
-                    </div>
+                    {/* moved avatar and profile text into the card body for stable layout */}
                   </div>
 
                   <div className="space-y-4 p-4">
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-3">
+                        <div
+                          className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full border-2 text-sm font-extrabold shadow-[3px_3px_0_rgba(0,0,0,0.15)]"
+                          style={{ backgroundColor: user.profileColor, borderColor: '#e9e6e1', color: '#ffffff' }}
+                        >
+                          {user.name.slice(0, 2)}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-lg font-extrabold text-[#4d3a2b] truncate">{user.name}</p>
+                          <p className="text-xs font-bold uppercase tracking-[0.12em] text-[#8e6a4f] truncate">{user.category}</p>
+                        </div>
+                      </div>
+                      <span className="rounded-full border border-[#e7d7c1] bg-[#fffaf3] px-2 py-1 text-[10px] font-bold text-[#5f4b3a]">
+                        {user.location}
+                      </span>
+                    </div>
+
                     <div className="flex flex-wrap gap-2">
                       <span className="border border-[#d8b08d] bg-[#f7ecd8] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-[#5b3d2d]">
                         {user.category}
@@ -411,6 +490,51 @@ export default function HomePage()
           })}
         </div>
       </section>
+      {/* Draw modal */}
+      {showDrawModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="w-full max-w-md p-6 border-4 border-[#7a5134] bg-[#fffaf3] shadow-[6px_6px_0_#7a5134] relative">
+            <button
+              onClick={closeDraw}
+              className="absolute top-3 right-3 rounded border-2 border-[#e1c7a4] bg-white/90 px-2 py-1 font-bold"
+            >
+              ✖
+            </button>
+
+            <h2 className="text-lg font-extrabold mb-4">🎲 오늘의 취미 픽셀 뽑기</h2>
+
+            <div className="flex items-center justify-center h-36 mb-4">
+              <div className="text-5xl mr-4">{DRAW_ITEMS[drawIndex].emoji}</div>
+              <div className="text-2xl font-extrabold">{DRAW_ITEMS[drawIndex].name}</div>
+            </div>
+
+            <div className="flex justify-center gap-3">
+              <button
+                onClick={openDraw}
+                disabled={spinning || drawDone}
+                className={`border-2 px-4 py-2 font-bold rounded ` +
+                  (spinning || drawDone
+                    ? 'bg-[#f0e7d8] text-[#8e6a4f] cursor-not-allowed'
+                    : 'bg-[#FAF4E8] text-[#5C4033] hover:bg-[#f7efe8]')}
+              >
+                {spinning ? '돌림 중...' : drawDone ? '이미 완료' : '돌려보기'}
+              </button>
+              <button onClick={closeDraw} className="border-2 border-[#e1c7a6] px-4 py-2 font-bold rounded bg-white/90">
+                닫기
+              </button>
+            </div>
+
+            {drawSelection && !spinning && (
+              <div className="mt-4 p-3 border-t border-[#e1c7a6]">
+                <p className="font-extrabold text-xl">오늘의 추천: {drawSelection.emoji} {drawSelection.name}</p>
+                <p className="mt-2 text-sm text-[#5f4b3a]">{drawSelection.tip}</p>
+                <div className="mt-3 text-2xl">🎉 ✨ 🎊</div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
     </main>
   );
 }

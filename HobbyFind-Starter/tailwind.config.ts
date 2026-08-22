@@ -47,6 +47,32 @@ const config = {
           DEFAULT: 'hsl(var(--card))',
           foreground: 'hsl(var(--card-foreground))',
         },
+        brand: {
+          DEFAULT: 'hsl(var(--brand))',
+          soft: 'hsl(var(--brand-soft))',
+          warm: 'hsl(var(--brand-warm))',
+          deep: 'hsl(var(--brand-deep))',
+          highlight: 'hsl(var(--brand-highlight))',
+          foreground: 'hsl(var(--brand-foreground))',
+        },
+        sand: {
+          50: 'hsl(var(--sand-50))',
+          100: 'hsl(var(--sand-100))',
+          200: 'hsl(var(--sand-200))',
+          300: 'hsl(var(--sand-300))',
+        },
+        sage: {
+          50: 'hsl(var(--sage-50))',
+          100: 'hsl(var(--sage-100))',
+          200: 'hsl(var(--sage-200))',
+          300: 'hsl(var(--sage-300))',
+        },
+        charcoal: {
+          50: 'hsl(var(--charcoal-50))',
+          100: 'hsl(var(--charcoal-100))',
+          200: 'hsl(var(--charcoal-200))',
+          300: 'hsl(var(--charcoal-300))',
+        },
       },
       borderRadius: {
         lg: 'var(--radius)',

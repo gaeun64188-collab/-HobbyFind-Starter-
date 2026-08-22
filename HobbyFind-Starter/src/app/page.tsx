@@ -148,6 +148,25 @@ export default function HomePage()
       };
     });
   };
+
+  // --- 로그인 상태(localStorage 기반) ---
+  const [userName, setUserName] = useState<string | null>(null);
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('userName');
+      if (stored) setUserName(stored);
+    } catch (e) {
+      // ignore
+    }
+  }, []);
+
+  const handleLogout = () => {
+    try {
+      localStorage.removeItem('userName');
+    } catch (e) {}
+    setUserName(null);
+  };
   
   const [activeCategory, setActiveCategory] = useState<'전체' | HobbyCategory>('전체');
   const [toolOffset, setToolOffset] = useState(0);
@@ -247,6 +266,140 @@ export default function HomePage()
     // keep drawDone state (one-per-day)
   };
 
+  // --- 내 프로필 생성기 상태 및 로직 ---
+  const CREATED_KEY = 'created_profiles';
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [createdProfiles, setCreatedProfiles] = useState<any[]>(() => {
+    try {
+      const raw = localStorage.getItem(CREATED_KEY);
+      return raw ? JSON.parse(raw) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+
+  const [createName, setCreateName] = useState('');
+  const [createLocation, setCreateLocation] = useState('');
+  const [createCategory, setCreateCategory] = useState<HobbyCategory>('예술형');
+  const [createHobbies, setCreateHobbies] = useState<Array<{ name: string; detail: string }>>([
+    { name: '', detail: '' },
+  ]);
+  const [createProfileImage, setCreateProfileImage] = useState('');
+  const [createCoverImage, setCreateCoverImage] = useState('');
+
+  const openCreate = () => setShowCreateModal(true);
+  const closeCreate = () => setShowCreateModal(false);
+
+  const addCreateHobby = () => setCreateHobbies((h) => [...h, { name: '', detail: '' }]);
+  const removeCreateHobby = (idx: number) =>
+    setCreateHobbies((h) => h.filter((_, i) => i !== idx));
+
+  const saveCreatedProfiles = (items: any[]) => {
+    try {
+      localStorage.setItem(CREATED_KEY, JSON.stringify(items));
+    } catch (e) {}
+  };
+
+  const submitCreate = () => {
+    const id = Date.now();
+    const hobbyName = createHobbies.find((h) => h.name)?.name ?? '취미 없음';
+    const bio = createHobbies.map((h) => `${h.name}${h.detail ? ` — ${h.detail}` : ''}`).join('; ');
+    const newProfile = {
+      id,
+      name: createName || `사용자${id}`,
+      category: createCategory,
+      hobby: hobbyName,
+      location: createLocation || '',
+      bio,
+      profileColor: '#'+Math.floor(Math.random()*16777215).toString(16).padStart(6,'0'),
+      profileImage: createProfileImage,
+      coverImage: createCoverImage,
+    };
+
+    const next = [newProfile, ...createdProfiles];
+    setCreatedProfiles(next);
+    saveCreatedProfiles(next);
+
+    // ensure followState has an entry for this profile id
+    setFollowState((prev) => ({
+      ...prev,
+      [id]: { isFollowing: false, count: Math.floor(Math.random() * 50) + 5 },
+    }));
+
+    // reset form and close
+    setCreateName('');
+    setCreateLocation('');
+    setCreateHobbies([{ name: '', detail: '' }]);
+    setCreateProfileImage('');
+    setCreateCoverImage('');
+    setShowCreateModal(false);
+  };
+
+  // --- edit / delete for created profiles ---
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editLocation, setEditLocation] = useState('');
+  const [editCategory, setEditCategory] = useState<HobbyCategory>('예술형');
+  const [editHobbies, setEditHobbies] = useState<Array<{ name: string; detail: string }>>([]);
+  const [editProfileImage, setEditProfileImage] = useState('');
+  const [editCoverImage, setEditCoverImage] = useState('');
+
+  const openEdit = (profile: any) => {
+    // populate edit form
+    setEditingId(profile.id);
+    setEditName(profile.name ?? '');
+    setEditLocation(profile.location ?? '');
+    setEditCategory(profile.category ?? '예술형');
+    // parse hobbies from bio if available, fall back to single hobby
+    if (profile.hobbies) {
+      setEditHobbies(profile.hobbies);
+    } else if (profile.bio) {
+      const parts = String(profile.bio).split(';').map((s: string) => s.trim()).filter(Boolean);
+      setEditHobbies(parts.map((p: string) => {
+        const [name, detail] = p.split('—').map((s: string) => s.trim());
+        return { name: name || p, detail: detail || '' };
+      }));
+    } else {
+      setEditHobbies([{ name: profile.hobby ?? '', detail: '' }]);
+    }
+    setEditProfileImage(profile.profileImage ?? '');
+    setEditCoverImage(profile.coverImage ?? '');
+    setShowEditModal(true);
+  };
+
+  const submitEdit = () => {
+    if (editingId == null) return;
+    const bio = editHobbies.map((h) => `${h.name}${h.detail ? ` — ${h.detail}` : ''}`).join('; ');
+    const next = createdProfiles.map((p) => p.id === editingId ? {
+      ...p,
+      name: editName,
+      location: editLocation,
+      category: editCategory,
+      hobby: editHobbies.find(h=>h.name)?.name ?? p.hobby,
+      bio,
+      profileImage: editProfileImage,
+      coverImage: editCoverImage,
+      hobbies: editHobbies,
+    } : p);
+    setCreatedProfiles(next);
+    saveCreatedProfiles(next);
+    setShowEditModal(false);
+    setEditingId(null);
+  };
+
+  const deleteCreated = (profileId: number) => {
+    const next = createdProfiles.filter((p) => p.id !== profileId);
+    setCreatedProfiles(next);
+    saveCreatedProfiles(next);
+    // remove followState entry if present
+    setFollowState((prev) => {
+      const copy = { ...prev } as any;
+      delete copy[profileId];
+      return copy;
+    });
+  };
+
   return (
     <main className="min-h-screen text-foreground">
       <header className="sticky top-0 z-20 border-b border-[#d7b99b] bg-[#fffaf3]/90 backdrop-blur-sm">
@@ -264,12 +417,24 @@ export default function HomePage()
 
           {/* 우측 로그인 & 탐색 버튼 */}
           <div className="flex items-center gap-2">
-            <Link
-              href="/login"
-              className="px-3 py-1.5 bg-[#FAF4E8] text-[#5C4033] text-xs font-bold border-2 border-[#5C4033] shadow-[2px_2px_0px_0px_#5C4033] hover:bg-[#F2E5D0]"
-            >
-              로그인
-            </Link>
+            {userName ? (
+              <div className="flex items-center gap-3">
+                <p className="text-sm font-bold text-[#5C4033]">{userName}님 환영합니다!</p>
+                <button
+                  onClick={handleLogout}
+                  className="px-3 py-1.5 bg-[#FAF4E8] text-[#5C4033] text-xs font-bold border-2 border-[#5C4033] shadow-[2px_2px_0px_#7a5134] hover:bg-[#F2E5D0]"
+                >
+                  로그아웃
+                </button>
+              </div>
+            ) : (
+              <Link
+                href="/login"
+                className="px-3 py-1.5 bg-[#FAF4E8] text-[#5C4033] text-xs font-bold border-2 border-[#5C4033] shadow-[2px_2px_0px_0px_#5C4033] hover:bg-[#F2E5D0]"
+              >
+                로그인
+              </Link>
+            )}
             <Button
               variant="outline"
               size="sm"
@@ -323,18 +488,27 @@ export default function HomePage()
       {/* 오늘의 취미 뽑기 버튼 영역 */}
       <section className="mx-auto max-w-7xl px-4 pb-8 sm:px-6 lg:px-8">
         <div className="flex justify-center">
-          <button
-            onClick={openDraw}
-            disabled={drawDone}
-            className={
-              `border-4 border-[#7a5134] bg-[#fffaf3] px-4 py-2 text-sm font-bold shadow-[4px_4px_0_#7a5134] transition-colors ` +
-              (drawDone
-                ? 'text-[#8e6a4f] opacity-60 cursor-not-allowed'
-                : 'text-[#5C4033] hover:bg-[#f7efe8]')
-            }
-          >
-            🎲 {drawDone ? '오늘의 취미 뽑기 완료 (내일 다시 도전!)' : '오늘의 취미 뽑기'}
-          </button>
+          <div className="flex gap-4">
+            <button
+              onClick={openDraw}
+              disabled={drawDone}
+              className={
+                `border-4 border-[#7a5134] bg-[#fffaf3] px-4 py-2 text-sm font-bold shadow-[4px_4px_0_#7a5134] transition-colors ` +
+                (drawDone
+                  ? 'text-[#8e6a4f] opacity-60 cursor-not-allowed'
+                  : 'text-[#5C4033] hover:bg-[#f7efe8]')
+              }
+            >
+              🎲 {drawDone ? '오늘의 취미 뽑기 완료 (내일 다시 도전!)' : '오늘의 취미 뽑기'}
+            </button>
+
+            <button
+              onClick={openCreate}
+              className="border-4 border-[#7a5134] bg-[#fffaf3] px-4 py-2 text-sm font-bold shadow-[4px_4px_0_#7a5134] hover:bg-[#f7efe8]"
+            >
+              ✨ 내 프로필 생성하기
+            </button>
+          </div>
         </div>
       </section>
 
@@ -413,7 +587,7 @@ export default function HomePage()
         </div>
 
         <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
-          {displayedUsers.map((user) => {
+          {(createdProfiles.concat(displayedUsers)).map((user) => {
             const coverImage = resolveHobbyCoverImage(
               user.hobby,
               user.category as HobbyCategory
@@ -421,7 +595,8 @@ export default function HomePage()
 
             // 이름(name)을 기준으로 profiles 데이터 매칭
             const matchedProfile = profiles.find((p) => p.name === user.name);
-            const profileId = matchedProfile?.id ?? 1;
+            const matchedCreated = createdProfiles.find((p) => p.name === user.name);
+            const profileId = matchedProfile?.id ?? matchedCreated?.id ?? 1;
 
             return (
               <Link key={`${user.name}-${user.hobby}`} href={`/profile/${profileId}`} className="block">
@@ -450,6 +625,24 @@ export default function HomePage()
                         {followState[profileId]?.isFollowing ? 'Following' : 'Follow'}
                       </button>
                     </div>
+
+                    {/* edit/delete for created profiles */}
+                    {createdProfiles.some((p) => p.id === profileId) && (
+                      <div className="absolute top-3 left-3 z-20 flex items-center gap-2">
+                        <button
+                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); openEdit(user); }}
+                          className="rounded-full px-2 py-1 text-xs font-bold border-2 bg-[#fffaf3]"
+                        >
+                          ✏️
+                        </button>
+                        <button
+                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); deleteCreated(profileId); }}
+                          className="rounded-full px-2 py-1 text-xs font-bold border-2 bg-[#fffaf3]"
+                        >
+                          🗑️
+                        </button>
+                      </div>
+                    )}
 
                     {/* moved avatar and profile text into the card body for stable layout */}
                   </div>
@@ -531,6 +724,140 @@ export default function HomePage()
                 <div className="mt-3 text-2xl">🎉 ✨ 🎊</div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Create profile modal */}
+      {showCreateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="w-full max-w-2xl p-6 border-4 border-[#7a5134] bg-[#fffaf3] shadow-[6px_6px_0_#7a5134] relative">
+            <button
+              onClick={closeCreate}
+              className="absolute top-3 right-3 rounded border-2 border-[#e1c7a4] bg-white/90 px-2 py-1 font-bold"
+            >
+              ✖
+            </button>
+
+            <h2 className="text-lg font-extrabold mb-4">✨ 내 프로필 생성하기</h2>
+
+            <div className="grid grid-cols-1 gap-3">
+              <div>
+                <label className="block text-xs font-bold">이름</label>
+                <input className="w-full border-2 border-[#e1c7a6] p-2" value={createName} onChange={(e) => setCreateName(e.target.value)} />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold">지역</label>
+                <input className="w-full border-2 border-[#e1c7a6] p-2" value={createLocation} onChange={(e) => setCreateLocation(e.target.value)} />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold">카테고리</label>
+                <select className="w-full border-2 border-[#e1c7a6] p-2" value={createCategory} onChange={(e) => setCreateCategory(e.target.value as HobbyCategory)}>
+                  <option value="운동형">운동형</option>
+                  <option value="수집형">수집형</option>
+                  <option value="예술형">예술형</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold mb-2">취미 목록</label>
+                <div className="space-y-2">
+                  {createHobbies.map((h, idx) => (
+                    <div key={idx} className="flex gap-2">
+                      <input placeholder="취미 이름" className="flex-1 border-2 border-[#e1c7a6] p-2" value={h.name} onChange={(e) => setCreateHobbies((prev) => prev.map((it, i) => i === idx ? { ...it, name: e.target.value } : it))} />
+                      <input placeholder="경력/시간" className="w-40 border-2 border-[#e1c7a6] p-2" value={h.detail} onChange={(e) => setCreateHobbies((prev) => prev.map((it, i) => i === idx ? { ...it, detail: e.target.value } : it))} />
+                      <button type="button" onClick={() => removeCreateHobby(idx)} className="border-2 px-2">삭제</button>
+                    </div>
+                  ))}
+                  <button type="button" onClick={addCreateHobby} className="mt-2 border-2 px-3 py-1 font-bold">+ 취미 추가</button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold">프로필 이미지 URL</label>
+                <input className="w-full border-2 border-[#e1c7a6] p-2" value={createProfileImage} onChange={(e) => setCreateProfileImage(e.target.value)} />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold">배경화면 이미지 URL</label>
+                <input className="w-full border-2 border-[#e1c7a6] p-2" value={createCoverImage} onChange={(e) => setCreateCoverImage(e.target.value)} />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-2">
+                <button onClick={submitCreate} className="border-2 border-[#7a5134] bg-[#fffaf3] px-4 py-2 font-bold shadow-[4px_4px_0_#7a5134]">등록</button>
+                <button onClick={closeCreate} className="border-2 border-[#e1c7a6] px-4 py-2">취소</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      
+
+      {/* Edit profile modal */}
+      {showEditModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="w-full max-w-2xl p-6 border-4 border-[#7a5134] bg-[#fffaf3] shadow-[6px_6px_0_#7a5134] relative">
+            <button
+              onClick={() => setShowEditModal(false)}
+              className="absolute top-3 right-3 rounded border-2 border-[#e1c7a4] bg-white/90 px-2 py-1 font-bold"
+            >
+              ✖
+            </button>
+
+            <h2 className="text-lg font-extrabold mb-4">✏️ 프로필 수정</h2>
+
+            <div className="grid grid-cols-1 gap-3">
+              <div>
+                <label className="block text-xs font-bold">이름</label>
+                <input className="w-full border-2 border-[#e1c7a6] p-2" value={editName} onChange={(e) => setEditName(e.target.value)} />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold">지역</label>
+                <input className="w-full border-2 border-[#e1c7a6] p-2" value={editLocation} onChange={(e) => setEditLocation(e.target.value)} />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold">카테고리</label>
+                <select className="w-full border-2 border-[#e1c7a6] p-2" value={editCategory} onChange={(e) => setEditCategory(e.target.value as HobbyCategory)}>
+                  <option value="운동형">운동형</option>
+                  <option value="수집형">수집형</option>
+                  <option value="예술형">예술형</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold mb-2">취미 목록</label>
+                <div className="space-y-2">
+                  {editHobbies.map((h, idx) => (
+                    <div key={idx} className="flex gap-2">
+                      <input placeholder="취미 이름" className="flex-1 border-2 border-[#e1c7a6] p-2" value={h.name} onChange={(e) => setEditHobbies((prev) => prev.map((it, i) => i === idx ? { ...it, name: e.target.value } : it))} />
+                      <input placeholder="경력/시간" className="w-40 border-2 border-[#e1c7a6] p-2" value={h.detail} onChange={(e) => setEditHobbies((prev) => prev.map((it, i) => i === idx ? { ...it, detail: e.target.value } : it))} />
+                      <button type="button" onClick={() => setEditHobbies((prev) => prev.filter((_, i) => i !== idx))} className="border-2 px-2">삭제</button>
+                    </div>
+                  ))}
+                  <button type="button" onClick={() => setEditHobbies((h) => [...h, { name: '', detail: '' }])} className="mt-2 border-2 px-3 py-1 font-bold">+ 취미 추가</button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold">프로필 이미지 URL</label>
+                <input className="w-full border-2 border-[#e1c7a6] p-2" value={editProfileImage} onChange={(e) => setEditProfileImage(e.target.value)} />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold">배경화면 이미지 URL</label>
+                <input className="w-full border-2 border-[#e1c7a6] p-2" value={editCoverImage} onChange={(e) => setEditCoverImage(e.target.value)} />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-2">
+                <button onClick={submitEdit} className="border-2 border-[#7a5134] bg-[#fffaf3] px-4 py-2 font-bold shadow-[4px_4px_0_#7a5134]">저장</button>
+                <button onClick={() => setShowEditModal(false)} className="border-2 border-[#e1c7a6] px-4 py-2">취소</button>
+              </div>
+            </div>
           </div>
         </div>
       )}

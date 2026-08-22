@@ -435,6 +435,7 @@ export default function HomePage()
                 로그인
               </Link>
             )}
+            
             <Button
               variant="outline"
               size="sm"
@@ -508,6 +509,12 @@ export default function HomePage()
             >
               ✨ 내 프로필 생성하기
             </button>
+            <Link
+              href="/community"
+              className="border-4 border-[#7a5134] bg-[#fffaf3] px-4 py-2 text-sm font-bold shadow-[4px_4px_0_#7a5134] hover:bg-[#f7efe8] ml-2"
+            >
+              💬 취미 커뮤니티
+            </Link>
           </div>
         </div>
       </section>
@@ -673,6 +680,13 @@ export default function HomePage()
                       <span className="border border-[#e7d7c1] bg-[#f8f1e8] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-[#5f4b3a]">
                         {user.hobby}
                       </span>
+                      <Link
+                        href={`/community/${encodeURIComponent(String(user.category))}`}
+                        onClick={(e) => { e.stopPropagation(); }}
+                        className="ml-2 inline-flex items-center gap-2 rounded-full border-2 border-[#e1c7a6] bg-[#fffaf3] px-2 py-1 text-xs font-bold text-[#5b3d2d]"
+                      >
+                        👥 모임 참여
+                      </Link>
                     </div>
 
                     <p className="text-sm leading-6 text-[#5f4b3a]">{user.bio}</p>
